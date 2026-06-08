@@ -125,6 +125,37 @@ def watchlist():
 
 
 # ---------------------------------------------------------------------------
+# Reddit: crowd-mood signal per ticker. Public JSON, no key. Needs a real
+# User-Agent or Reddit returns 429. UNVERIFIED, pumped and noisy by nature —
+# surfaced as crowd mood only, never as a reason to act.
+# ---------------------------------------------------------------------------
+def reddit_sentiment():
+    raw = os.environ.get("WATCHLIST", DEFAULT_WATCHLIST)
+    syms = [s.strip().upper() for s in raw.split(",") if s.strip()]
+    ua = {"User-Agent": "world-brief:sentiment:v1 (personal briefing bot)"}
+    out = ["[reddit] Recent post volume + sample titles per ticker "
+           "(UNVERIFIED crowd chatter — sentiment only, not a signal):"]
+    for sym in syms:
+        try:
+            url = "https://www.reddit.com/r/stocks+wallstreetbets+investing/search.json"
+            params = {"q": sym, "restrict_sr": 1, "sort": "new",
+                      "limit": 8, "t": "week"}
+            r = _get(url, headers=ua, params=params)
+            r.raise_for_status()
+            posts = r.json().get("data", {}).get("children", [])
+            titles = [p["data"].get("title", "").strip() for p in posts][:3]
+            n = len(posts)
+            if titles:
+                out.append(f"  - {sym}: {n} recent posts. Samples: {' | '.join(titles)}")
+            else:
+                out.append(f"  - {sym}: no recent posts found this week.")
+            time.sleep(1)  # be polite to Reddit's rate limit
+        except Exception as e:
+            out.append(f"  - {sym}: reddit unavailable ({type(e).__name__})")
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
 # News: GDELT — free global news, no key. Returns recent salient articles.
 # ---------------------------------------------------------------------------
 def news():
@@ -186,6 +217,7 @@ def gather():
         f"=== RAW DATA SNAPSHOT @ {now} ===",
         _safe(markets, "markets"),
         _safe(watchlist, "watchlist"),
+        _safe(reddit_sentiment, "reddit"),
         _safe(fred, "macro/FRED"),
         _safe(calendar, "calendar"),
         _safe(news, "news/GDELT"),

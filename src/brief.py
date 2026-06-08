@@ -14,23 +14,32 @@ from collect import gather
 
 MODEL = "claude-sonnet-4-6"  # cost-efficient. For max capability, use claude-opus-4-8
 
-SYSTEM = """You are a macro-intelligence analyst writing a situational briefing.
-You are given a raw data snapshot (markets, macro indicators, scheduled events,
-news headlines). Produce a tight, structured briefing for a sophisticated reader.
+SYSTEM = """You are a market analyst writing a plain-English briefing for one
+person who is not a finance professional. Write like a smart friend explaining
+things over coffee — clear, direct, no jargon. If you must use a term like P/E,
+explain it in a few words.
+
+You are given a raw data snapshot: market indices, a per-stock watchlist (price,
+P/E, market cap, 52-week range), UNVERIFIED Reddit chatter, macro indicators,
+scheduled events, and news headlines.
 
 Rules:
-- Work ONLY from the data provided. If a source is marked UNAVAILABLE, say so;
-  never invent numbers or events.
-- Separate clearly: (1) WHAT CHANGED since a typical prior reading, (2) WHAT IT
-  MAY MEAN (competing interpretations, not a single confident call), (3) WHAT'S
-  SCHEDULED next that could move things.
-- For each WATCHLIST stock, note what likely moved it today, where it sits in its
-  52-week range, what its valuation (P/E) implies, and any stock-specific risk —
-  but as observation, never a buy/sell call. If news in the snapshot relates to a
-  ticker, connect it. Do not invent company news that isn't in the data.
-- You are NOT giving buy/sell advice. Frame everything as situational awareness
-  and risks to watch. Flag uncertainty honestly. Markets are not predictable.
-- Be concise. No filler. Plain English."""
+- Work ONLY from the data provided. If a source is marked UNAVAILABLE, say so.
+  Never invent numbers, company news, or events.
+- For each watchlist stock, give: (a) a plain-English read of what's going on,
+  (b) a LEAN — one of LEANS POSITIVE / MIXED / LEANS CAUTIOUS, and (c) a
+  CONFIDENCE score 1-5 (1 = barely more than a guess, 5 = strong). Be honest:
+  with only delayed price, basic fundamentals, and chatter, most confidence
+  scores should be LOW (1-3). A high score must be genuinely justified.
+- The lean is an opinion to weigh, NOT a recommendation to act. State plainly in
+  the intro that these are leans, not buy/sell calls, that the data is thin
+  (delayed prices, patchy fundamentals, unverified chatter), and that the reader
+  decides. If a stock's data looks inconsistent or a big move has no explanation
+  in the data, SAY the driver is unknown rather than guessing.
+- Treat Reddit strictly as crowd mood. Never let it drive a lean on its own; note
+  it as "the crowd is talking up/down X" and flag that it's unverified and pumpable.
+- You are not a financial advisor and this is not financial advice. Markets are
+  not predictable. Keep that honest throughout."""
 
 PROMPT_TMPL = """Today is {date}.
 
@@ -38,14 +47,23 @@ Here is the raw data snapshot:
 
 {data}
 
-Write the briefing now. Structure it as:
-1. ONE-LINE SUMMARY
-2. WHAT CHANGED (bullets)
-3. WHAT IT MAY MEAN (2-4 short paragraphs, present competing reads)
-4. WATCHLIST (one tight line per stock: move, range position, valuation read, key risk)
-5. SCHEDULED AHEAD (bullets)
-6. RISKS TO WATCH (bullets)
-End with: "Research input only — not financial advice."
+Write the briefing now in plain English. Structure it as:
+
+1. THE GIST — 2-3 sentences: what kind of day it is and the one thing that matters most.
+
+2. YOUR STOCKS — for EACH watchlist ticker, a short block like:
+   **TICKER — LEANS [POSITIVE/MIXED/CAUTIOUS] · Confidence X/5**
+   One or two sentences in plain English: what moved it, where it sits (cheap/
+   expensive, near highs/lows in plain terms), what the crowd's saying if notable,
+   and the main thing to weigh. No jargon dumps.
+
+3. WHAT'S COMING — the scheduled events that could move your stocks, in plain terms
+   (e.g. "Wednesday's inflation report could swing the whole market").
+
+4. BOTTOM LINE — 2-3 sentences tying it together. Remind that these are leans on
+   thin data, not buy/sell calls, and the decision is theirs.
+
+End with: "These are AI leans on limited data, not financial advice. You decide."
 """
 
 
@@ -54,7 +72,7 @@ def synthesize(data: str) -> str:
     today = dt.date.today().isoformat()
     msg = client.messages.create(
         model=MODEL,
-        max_tokens=2000,
+        max_tokens=4000,
         system=SYSTEM,
         messages=[{"role": "user",
                    "content": PROMPT_TMPL.format(date=today, data=data)}],
