@@ -125,33 +125,46 @@ def watchlist():
 
 
 # ---------------------------------------------------------------------------
-# Reddit: crowd-mood signal per ticker. Public JSON, no key. Needs a real
-# User-Agent or Reddit returns 429. UNVERIFIED, pumped and noisy by nature —
-# surfaced as crowd mood only, never as a reason to act.
+# Crowd mood: StockTwits public stream. Free, no auth. Each message carries a
+# user-tagged Bullish/Bearish label, so we report an actual bull/bear ratio per
+# ticker — "what the majority posting right now are saying."
+# UNVERIFIED, pumpable, retail-skewed — crowd mood only, never a signal.
 # ---------------------------------------------------------------------------
-def reddit_sentiment():
+def crowd_mood():
     raw = os.environ.get("WATCHLIST", DEFAULT_WATCHLIST)
     syms = [s.strip().upper() for s in raw.split(",") if s.strip()]
-    ua = {"User-Agent": "world-brief:sentiment:v1 (personal briefing bot)"}
-    out = ["[reddit] Recent post volume + sample titles per ticker "
-           "(UNVERIFIED crowd chatter — sentiment only, not a signal):"]
+    ua = {"User-Agent": "Mozilla/5.0 (world-brief)"}
+    out = ["[crowd/StockTwits] Bull/bear split of recent posts per ticker "
+           "(UNVERIFIED retail chatter — crowd mood only, not a signal):"]
     for sym in syms:
         try:
-            url = "https://www.reddit.com/r/stocks+wallstreetbets+investing/search.json"
-            params = {"q": sym, "restrict_sr": 1, "sort": "new",
-                      "limit": 8, "t": "week"}
-            r = _get(url, headers=ua, params=params)
+            url = f"https://api.stocktwits.com/api/2/streams/symbol/{sym}.json"
+            r = _get(url, headers=ua)
             r.raise_for_status()
-            posts = r.json().get("data", {}).get("children", [])
-            titles = [p["data"].get("title", "").strip() for p in posts][:3]
-            n = len(posts)
-            if titles:
-                out.append(f"  - {sym}: {n} recent posts. Samples: {' | '.join(titles)}")
+            msgs = r.json().get("messages", [])
+            bull = bear = 0
+            for m in msgs:
+                s = (m.get("entities", {}) or {}).get("sentiment") or {}
+                tag = (s.get("basic") or "").lower()
+                if tag == "bullish":
+                    bull += 1
+                elif tag == "bearish":
+                    bear += 1
+            tagged = bull + bear
+            total = len(msgs)
+            if tagged == 0:
+                out.append(f"  - {sym}: {total} recent posts, none tagged "
+                           f"bull/bear (no clear lean).")
             else:
-                out.append(f"  - {sym}: no recent posts found this week.")
-            time.sleep(1)  # be polite to Reddit's rate limit
+                pct = round(bull / tagged * 100)
+                mood = ("mostly bullish" if pct >= 60 else
+                        "mostly bearish" if pct <= 40 else "split")
+                out.append(f"  - {sym}: {total} recent posts; of those tagged, "
+                           f"{pct}% bullish / {100-pct}% bearish — {mood} "
+                           f"({tagged} tagged).")
+            time.sleep(0.5)
         except Exception as e:
-            out.append(f"  - {sym}: reddit unavailable ({type(e).__name__})")
+            out.append(f"  - {sym}: stocktwits unavailable ({type(e).__name__})")
     return "\n".join(out)
 
 
@@ -217,7 +230,7 @@ def gather():
         f"=== RAW DATA SNAPSHOT @ {now} ===",
         _safe(markets, "markets"),
         _safe(watchlist, "watchlist"),
-        _safe(reddit_sentiment, "reddit"),
+        _safe(crowd_mood, "crowd/StockTwits"),
         _safe(fred, "macro/FRED"),
         _safe(calendar, "calendar"),
         _safe(news, "news/GDELT"),
