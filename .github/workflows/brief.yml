@@ -2,13 +2,16 @@ name: world-brief
 
 on:
   schedule:
-    # Times are UTC. GitHub cron doesn't observe DST, so these are set for
+    # Every 4 hours, all day, on a grid anchored to the US market open.
+    # Times are UTC. GitHub cron doesn't observe DST — these are set for
     # CENTRAL DAYLIGHT TIME (summer, UTC-5). In winter (CST, UTC-6) each fires
-    # 1 hour earlier in local time — subtract 1 from each hour below to fix.
-    - cron: "30 12 * * 1-5"   # 7:30am CT — pre-market read
-    - cron: "30 13 * * 1-5"   # 8:30am CT — market open
-    - cron: "30 16 * * 1-5"   # 11:30am CT — midday
-    - cron: "0 20 * * 1-5"    # 3:00pm CT — close wrap
+    # 1 hour earlier locally — subtract 1 from each hour below to realign.
+    - cron: "30 13 * * *"   # 8:30am CT — market OPEN (anchor)
+    - cron: "30 17 * * *"   # 12:30pm CT — midday
+    - cron: "30 21 * * *"   # 4:30pm CT — post-close wrap (~1.5h after 3pm close)
+    - cron: "30 1 * * *"    # 8:30pm CT — evening
+    - cron: "30 5 * * *"    # 12:30am CT — overnight
+    - cron: "30 9 * * *"    # 4:30am CT — pre-dawn
   workflow_dispatch: {}   # lets you trigger manually from the Actions tab
 
 jobs:
