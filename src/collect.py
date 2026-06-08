@@ -122,6 +122,12 @@ def watchlist():
         except Exception as e:
             out.append(f"  - {sym}: unavailable ({type(e).__name__})")
     return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# News: GDELT — free global news, no key. Returns recent salient articles.
+# ---------------------------------------------------------------------------
+def news():
     url = "https://api.gdeltproject.org/api/v2/doc/doc"
     params = {
         "query": "(economy OR markets OR Federal Reserve OR geopolitics) sourcelang:english",
