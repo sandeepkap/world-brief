@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 import anthropic
 from collect import gather
 
-MODEL = "claude-opus-4-20250514"  # swap to a cheaper model if cost matters
+MODEL = "claude-sonnet-4-6"  # cost-efficient. For max capability, use claude-opus-4-8
 
 SYSTEM = """You are a macro-intelligence analyst writing a situational briefing.
 You are given a raw data snapshot (markets, macro indicators, scheduled events,
@@ -24,6 +24,10 @@ Rules:
 - Separate clearly: (1) WHAT CHANGED since a typical prior reading, (2) WHAT IT
   MAY MEAN (competing interpretations, not a single confident call), (3) WHAT'S
   SCHEDULED next that could move things.
+- For each WATCHLIST stock, note what likely moved it today, where it sits in its
+  52-week range, what its valuation (P/E) implies, and any stock-specific risk —
+  but as observation, never a buy/sell call. If news in the snapshot relates to a
+  ticker, connect it. Do not invent company news that isn't in the data.
 - You are NOT giving buy/sell advice. Frame everything as situational awareness
   and risks to watch. Flag uncertainty honestly. Markets are not predictable.
 - Be concise. No filler. Plain English."""
@@ -38,8 +42,9 @@ Write the briefing now. Structure it as:
 1. ONE-LINE SUMMARY
 2. WHAT CHANGED (bullets)
 3. WHAT IT MAY MEAN (2-4 short paragraphs, present competing reads)
-4. SCHEDULED AHEAD (bullets)
-5. RISKS TO WATCH (bullets)
+4. WATCHLIST (one tight line per stock: move, range position, valuation read, key risk)
+5. SCHEDULED AHEAD (bullets)
+6. RISKS TO WATCH (bullets)
 End with: "Research input only — not financial advice."
 """
 
